@@ -1,0 +1,95 @@
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                             │
+│  🚨 RENDER ENVIRONMENT VARIABLES - COPY/PASTE THIS                         │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+Go to: https://dashboard.render.com
+       → Select your backend service
+       → Click "Environment" in sidebar
+       → Add/Update these variables:
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ CRITICAL: Update this key first!                                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+Key: OPENROUTER_API_KEY
+Value: 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
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Required: Add these if not already set                                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+Key: PINECONE_API_KEY
+Value: pcsk_3pCQ8i_FNkw3Sw7eHTLvXXhX2ChSpq9XeactxNVcPHoNxuNkisvgnULVJHBtF2bAZxdePJ
+
+Key: PINECONE_INDEX_NAME
+Value: default
+
+Key: PINECONE_HOST
+Value: default-jvpb9gd.svc.aped-4627-b74a.pinecone.io
+
+Key: PINECONE_ENVIRONMENT
+Value: us-east-1-aws
+
+Key: OPENROUTER_DEFAULT_MODEL
+Value: google/gemini-2.0-flash-exp:free
+
+Key: OPENROUTER_EMBED_MODEL
+Value: openai/text-embedding-3-small
+
+Key: ALLOWED_ORIGINS
+Value: *
+
+Key: NODE_ENV
+Value: production
+
+Key: PORT
+Value: 3000
+
+Key: SITE_URL
+Value: https://cura-ai-kjv1.onrender.com
+
+Key: RAG_TOP_K
+Value: 8
+
+Key: RAG_THRESHOLD_HIGH
+Value: 0.80
+
+Key: RAG_THRESHOLD_PARTIAL
+Value: 0.70
+
+Key: RAG_THRESHOLD_FALLBACK
+Value: 0.60
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ After adding all variables:                                                │
+│ 1. Click "Save Changes" at the bottom                                      │
+│ 2. Render will auto-redeploy (takes 1-2 minutes)                           │
+│ 3. Watch logs for: "OPENROUTER_API_KEY: ✓ SET (length: 73)"               │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+Current Error on Render:
+  "OpenRouter API error: 401 - User not found"
+  
+This means Render is using the OLD broken key.
+After updating the key above, this error will be FIXED.
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Test after deployment:                                                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+PowerShell:
+  $body = @{query="What is diabetes?"} | ConvertTo-Json
+  Invoke-RestMethod -Uri "https://cura-ai-kjv1.onrender.com/api/search" `
+    -Method Post -Body $body -ContentType "application/json"
+
+Expected: Should return a JSON response with medical information about diabetes
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ WHY THIS IS NEEDED:                                                         │
+│ - The .env file is in .gitignore (security best practice)                  │
+│ - It never gets pushed to GitHub or deployed to Render                     │
+│ - Render needs environment variables set in its dashboard                  │
+│ - This is the standard way to handle secrets in production                 │
+└─────────────────────────────────────────────────────────────────────────────┘
