@@ -13,21 +13,50 @@ const __dirname = path.dirname(__filename);
 // Load unified .env file (single source for all environments)
 const envPath = path.resolve(__dirname, '../.env');
 
+console.log('[Server] =================================================');
+console.log('[Server] Environment Variable Loading');
+console.log('[Server] =================================================');
+console.log(`[Server] Looking for .env file at: ${envPath}`);
+console.log(`[Server] File exists: ${existsSync(envPath)}`);
+
 if (existsSync(envPath)) {
   dotenv.config({ path: envPath });
   console.log('[Server] ✓ Loaded .env file from filesystem');
-  console.log(`[Server] Environment: ${process.env.NODE_ENV || 'production'}`);
-  console.log(`[Server] Port: ${process.env.PORT || '3000'}`);
 } else {
-  console.log('[Server] ℹ No .env file found - using system environment variables (normal for Render)');
+  console.log('[Server] ℹ No .env file found - will use system environment variables');
+  console.log('[Server] ℹ This is NORMAL for Render deployment');
 }
+
+console.log('[Server] -------------------------------------------------');
+console.log('[Server] Current Environment Variables Status:');
+console.log(`[Server] NODE_ENV: ${process.env.NODE_ENV || 'not set'}`);
+console.log(`[Server] PORT: ${process.env.PORT || 'not set'}`);
+console.log(`[Server] OPENROUTER_API_KEY: ${process.env.OPENROUTER_API_KEY ? '✓ SET (length: ' + process.env.OPENROUTER_API_KEY.length + ')' : '❌ NOT SET'}`);
+console.log(`[Server] PINECONE_API_KEY: ${process.env.PINECONE_API_KEY ? '✓ SET (length: ' + process.env.PINECONE_API_KEY.length + ')' : '❌ NOT SET'}`);
+console.log(`[Server] PINECONE_HOST: ${process.env.PINECONE_HOST || 'not set'}`);
+console.log(`[Server] PINECONE_INDEX_NAME: ${process.env.PINECONE_INDEX_NAME || 'not set'}`);
+console.log('[Server] =================================================');
 
 // Verify critical environment variables are present (from .env or system)
 const requiredVars = ['OPENROUTER_API_KEY', 'PINECONE_API_KEY'];
 const missingVars = requiredVars.filter(varName => !process.env[varName]);
 if (missingVars.length > 0) {
-  console.error(`[Server] ❌ Missing required environment variables: ${missingVars.join(', ')}`);
-  console.error('[Server] Please set these in Render dashboard: https://dashboard.render.com');
+  console.error('[Server] ❌ DEPLOYMENT ERROR: Missing required environment variables');
+  console.error(`[Server] ❌ Missing: ${missingVars.join(', ')}`);
+  console.error('[Server] -------------------------------------------------');
+  console.error('[Server] 📋 ACTION REQUIRED:');
+  console.error('[Server] 1. Go to: https://dashboard.render.com');
+  console.error('[Server] 2. Select your backend service');
+  console.error('[Server] 3. Click "Environment" in the left sidebar');
+  console.error('[Server] 4. Add these environment variables:');
+  missingVars.forEach(varName => {
+    console.error(`[Server]    - ${varName}=<your_key_here>`);
+  });
+  console.error('[Server] 5. Click "Save Changes"');
+  console.error('[Server] 6. Render will auto-redeploy');
+  console.error('[Server] -------------------------------------------------');
+  console.error('[Server] 📖 Full setup guide: see curai-backend/RENDER_ENV_SETUP.md');
+  console.error('[Server] =================================================');
   process.exit(1);
 }
 
