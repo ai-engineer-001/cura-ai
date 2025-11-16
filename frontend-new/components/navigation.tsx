@@ -9,10 +9,10 @@ export default function Navigation() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
-              <span className="text-sm font-bold text-primary-foreground">CA</span>
+            <div className="flex h-10 w-10 items-center justify-center">
+              <img src="/curaai-logo.png" alt="CuraAI Logo" className="w-10 h-10 object-contain" />
             </div>
-            <span className="text-xl font-bold text-foreground">CuraAI</span>
+            <span className="font-bold text-lg text-foreground hidden sm:inline">Cura AI</span>
           </div>
 
           <div className="hidden md:flex items-center gap-8">

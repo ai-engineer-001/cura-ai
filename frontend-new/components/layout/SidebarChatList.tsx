@@ -3,31 +3,52 @@
 import { useChatStore } from "@/store/chatStore"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Plus, MessageSquare, Trash2, Settings, LogOut } from "lucide-react"
+import { Plus, MessageSquare, Trash2, Settings, LogOut, Menu } from "lucide-react"
 import { formatTime, truncate } from "@/lib/utils"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
 
+
 interface SidebarChatListProps {
-  onNewChat: () => void
-  onOpenSettings: () => void
+  onNewChat: () => void;
+  onOpenSettings: () => void;
+  onToggleSidebar?: () => void;
+  isSidebarOpen?: boolean;
 }
 
-export function SidebarChatList({ onNewChat, onOpenSettings }: SidebarChatListProps) {
-  const { chats, activeChat, setActiveChat, deleteChat } = useChatStore()
+export function SidebarChatList({ onNewChat, onOpenSettings, onToggleSidebar, isSidebarOpen }: SidebarChatListProps) {
+  const { chats, activeChat, setActiveChat, deleteChat } = useChatStore();
 
   return (
-    <div className="flex flex-col h-full w-64 border-r border-border bg-card fixed z-40 left-0 top-0 transition-transform duration-300 ease-in-out md:relative md:translate-x-0 md:w-64 w-4/5 max-w-xs sm:w-64" style={{ minWidth: 0 }}>
+    <div
+      className={`flex flex-col h-full w-64 border-r border-border bg-card fixed z-40 left-0 top-0 transition-transform duration-300 ease-in-out md:relative md:translate-x-0 md:w-64 w-4/5 max-w-xs sm:w-64 ${typeof window !== 'undefined' && window.innerWidth < 768 && typeof isSidebarOpen !== 'undefined' && !isSidebarOpen ? '-translate-x-full' : ''}`}
+      style={{ minWidth: 0 }}
+    >
       {/* Header */}
       <div className="p-4 border-b border-border flex-shrink-0">
         <div className="flex items-center justify-between mb-4 gap-2">
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <span className="text-xs font-bold text-primary-foreground">🩺</span>
-            </div>
+            <img src="/curaai-logo.png" alt="CuraAI Logo" className="w-20 h-20 object-contain" />
             <span className="font-bold text-base md:text-lg">Cura AI</span>
           </Link>
-          <Button variant="ghost" size="icon" onClick={onOpenSettings}>
+          {/* Menu button for mobile */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onToggleSidebar}
+            className="md:hidden"
+            aria-label="Open menu"
+          >
+            <Menu className="w-5 h-5" />
+          </Button>
+          {/* Settings button for desktop */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onOpenSettings}
+            className="hidden md:inline-flex"
+            aria-label="Open settings"
+          >
             <Settings className="w-4 h-4" />
           </Button>
         </div>
@@ -77,12 +98,22 @@ export function SidebarChatList({ onNewChat, onOpenSettings }: SidebarChatListPr
       </ScrollArea>
 
       {/* Footer */}
-      <div className="p-4 border-t border-border flex-shrink-0">
+      <div className="p-4 border-t border-border flex-shrink-0 relative">
         <p className="text-xs text-muted-foreground text-center">
           Cura AI v1.0
           <br />
           Medical Emergency Assistant
         </p>
+        {/* Settings button for mobile, fixed to bottom left */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onOpenSettings}
+          className="md:hidden fixed left-4 bottom-4 z-50 bg-background border border-border shadow-lg"
+          aria-label="Open settings"
+        >
+          <Settings className="w-5 h-5" />
+        </Button>
       </div>
     </div>
   )

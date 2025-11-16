@@ -4,12 +4,9 @@
   "private": true,
   "scripts": {
     "build": "next build",
-    "dev": "next dev -p 3001",
-    "dev:local": "cp .env.local .env.development.local && next dev -p 3001",
-    "dev:prod": "cp .env.production .env.development.local && next dev -p 3001",
+    "dev": "next dev",
     "lint": "eslint .",
-    "start": "next start -p 3001",
-    "preview": "npm run build && npm run start"
+    "start": "next start"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

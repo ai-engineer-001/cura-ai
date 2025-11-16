@@ -10,7 +10,6 @@ import { ChatWindow } from "@/components/chat/ChatWindow"
 import { ChatInputBar } from "@/components/chat/ChatInputBar"
 import { RealtimeModeUI } from "@/components/realtime/RealtimeModeUI"
 import { SettingsDialog } from "@/components/settings/SettingsDialog"
-// import { initWebSocketManager, disconnectWebSocket } from "@/lib/websocket" // Disabled for mock mode
 import { AudioRecorder } from "@/lib/audio"
 import { VideoCapture } from "@/lib/video"
 
@@ -76,7 +75,7 @@ export default function ChatPage() {
       content: message,
     });
 
-    // Wait for the user message to be rendered in the DOM
+    // Wait for the user message to be rendered in the DOM using MutationObserver
     await new Promise((resolve) => {
       const chatWindow = document.querySelector('[data-chat-window]');
       if (!chatWindow) return resolve(undefined);
@@ -87,10 +86,10 @@ export default function ChatPage() {
       observer.observe(chatWindow, { childList: true, subtree: true });
     });
 
-    // Generate unique assistant message ID
+    // Generate a unique assistant message ID
     const assistantMessageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-    // Add empty assistant message
+    // Add empty assistant message with known ID
     addMessage(currentChatId, {
       role: "assistant",
       content: "",
@@ -98,28 +97,31 @@ export default function ChatPage() {
       id: assistantMessageId,
     });
 
-    // Call backend API
+    // Call real backend API on Render
     let accumulatedText = "";
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/search`, {
+      const backendUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://cura-ai-kjv1.onrender.com/api';
+      console.log('[Chat] Calling backend:', backendUrl);
+      
+      const response = await fetch(`${backendUrl}/search`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: message }),
+        body: JSON.stringify({ query: message, sessionId: currentChatId })
       });
 
       if (!response.ok) {
-        throw new Error(`API error: ${response.statusText}`);
+        const errorText = await response.text();
+        throw new Error(`Backend error (${response.status}): ${errorText}`);
       }
 
       const data = await response.json();
-      accumulatedText = data.response;
+      accumulatedText = data.response || "No response from backend.";
       updateMessage(currentChatId, assistantMessageId, accumulatedText);
-      
     } catch (error) {
       console.error("Failed to send message:", error);
       addMessage(currentChatId, {
         role: "system",
-        content: "Failed to connect to backend. Please check if the server is running.",
+        content: "Failed to send message. Please check backend connection.",
       });
     }
   }
@@ -129,79 +131,48 @@ export default function ChatPage() {
     if (!activeChat) return
 
     if (!isRealtimeMode) {
-      // Start realtime mode with WebSocket
+      // Start realtime mode - Real WebSocket connection
       try {
-        const WS_URL = process.env.NEXT_PUBLIC_WS_BASE_URL || 'ws://localhost:3000';
-        const ws = new WebSocket(`${WS_URL}/ws/realtime?sessionId=${activeChat}`);
-        
-        ws.onopen = () => {
-          console.log('[WebSocket] Connected to realtime server');
-        };
-        
-        ws.onmessage = (event) => {
-          const data = JSON.parse(event.data);
-          console.log('[WebSocket] Received:', data);
-          
-          if (data.type === 'transcription') {
-            setCurrentTranscription(data.text);
-          } else if (data.type === 'response') {
-            addMessage(activeChat, {
-              role: "assistant",
-              content: data.text,
-            });
-          } else if (data.type === 'emergency') {
-            setEmergencyState(data.state, data.message);
-          }
-        };
-        
-        ws.onerror = (error) => {
-          console.error('[WebSocket] Error:', error);
-          addMessage(activeChat, {
-            role: "system",
-            content: "WebSocket connection error. Please check backend.",
-          });
-        };
-
-        // Start audio recording
-        audioRecorderRef.current = new AudioRecorder();
+        audioRecorderRef.current = new AudioRecorder()
         audioRecorderRef.current.setOnDataAvailable((audioChunk) => {
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.send(audioChunk);
-          }
-        });
-        
+          console.log("[Realtime] Audio chunk captured:", audioChunk.byteLength, "bytes")
+          // TODO: Send to WebSocket when realtime backend is ready
+        })
         await audioRecorderRef.current.start(
           selectedAudioDevice && selectedAudioDevice !== "default" ? selectedAudioDevice : undefined
-        );
+        )
 
-        setRealtimeMode(true);
-        setListening(true);
-        
+        setRealtimeMode(true)
+        setListening(true)
+
+        // TODO: Initialize WebSocket connection to backend
+        console.log("[Realtime] Mode activated - waiting for WebSocket implementation")
       } catch (error) {
-        console.error("Failed to start realtime mode:", error);
+        console.error("Failed to start realtime mode:", error)
         addMessage(activeChat, {
           role: "system",
-          content: "Failed to start realtime mode. Please check your microphone permissions and backend connection.",
-        });
+          content: "Failed to start realtime mode. Please check your microphone permissions.",
+        })
       }
     } else {
       // Stop realtime mode
       if (audioRecorderRef.current) {
-        audioRecorderRef.current.stop();
-        audioRecorderRef.current = null;
+        audioRecorderRef.current.stop()
+        audioRecorderRef.current = null
       }
 
       if (videoCaptureRef.current) {
-        videoCaptureRef.current.stop();
-        videoCaptureRef.current = null;
-        setVideoElement(null);
+        videoCaptureRef.current.stop()
+        videoCaptureRef.current = null
+        setVideoElement(null)
       }
 
-      setRealtimeMode(false);
-      setListening(false);
-      setVideoActive(false);
-      setCurrentTranscription("");
-      setEmergencyState(null);
+      // TODO: Disconnect WebSocket when implemented
+      setRealtimeMode(false)
+      setListening(false)
+      setVideoActive(false)
+      setCurrentTranscription("")
+      setEmergencyState(null)
     }
   }
 
@@ -210,22 +181,22 @@ export default function ChatPage() {
     if (!activeChat || !isRealtimeMode) return
 
     if (!videoCaptureRef.current) {
-      // Start video capture with WebSocket
+      // Start video capture
       try {
-        videoCaptureRef.current = new VideoCapture();
+        videoCaptureRef.current = new VideoCapture()
         await videoCaptureRef.current.start(
           selectedVideoDevice && selectedVideoDevice !== "default" ? selectedVideoDevice : undefined
-        );
+        )
 
         videoCaptureRef.current.setOnFrameCapture((frameData) => {
-          // Send frames via WebSocket (implement WebSocket connection management)
-          console.log("[Video] Frame captured:", frameData.length, "bytes");
-        });
+          console.log("[Video] Frame captured:", frameData.length, "bytes")
+          // TODO: Send to WebSocket when video backend is ready
+        })
 
-        setVideoElement(videoCaptureRef.current.getVideoElement());
-        setVideoActive(true);
+        setVideoElement(videoCaptureRef.current.getVideoElement())
+        setVideoActive(true)
       } catch (error) {
-        console.error("Failed to start video:", error);
+        console.error("Failed to start video:", error)
       }
     } else {
       // Stop video capture
@@ -245,7 +216,12 @@ export default function ChatPage() {
     <div className="flex h-screen bg-background">
       {/* Sidebar */}
       <div className={`${sidebarOpen ? "block" : "hidden"} lg:block`}>
-        <SidebarChatList onNewChat={handleNewChat} onOpenSettings={() => setSettingsOpen(true)} />
+        <SidebarChatList
+          onNewChat={handleNewChat}
+          onOpenSettings={() => setSettingsOpen(true)}
+          onToggleSidebar={() => setSidebarOpen((open) => !open)}
+          isSidebarOpen={sidebarOpen}
+        />
       </div>
 
       {/* Main Content */}

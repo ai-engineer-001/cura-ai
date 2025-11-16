@@ -7,12 +7,12 @@
   "regions": ["iad1"],
   "env": {
     "NEXT_PUBLIC_API_BASE_URL": {
-      "description": "Backend API URL (e.g., https://your-backend.onrender.com/api)",
-      "value": "https://your-backend.onrender.com/api"
+      "description": "Backend API URL (e.g., https://cura-ai-kjv1.onrender.com/api)",
+      "value": "https://cura-ai-kjv1.onrender.com/api"
     },
     "NEXT_PUBLIC_WS_BASE_URL": {
-      "description": "WebSocket URL (e.g., wss://your-backend.onrender.com)",
-      "value": "wss://your-backend.onrender.com"
+      "description": "WebSocket URL (e.g., wss://cura-ai-kjv1.onrender.com)",
+      "value": "wss://cura-ai-kjv1.onrender.com"
     },
     "NEXT_PUBLIC_USE_MOCK": {
       "value": "false"

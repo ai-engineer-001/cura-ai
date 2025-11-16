@@ -53,7 +53,7 @@ export function VideoPreview({ isActive, videoElement }: VideoPreviewProps) {
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="w-[600px] h-[320px] rounded-[10px] bg-muted flex items-center justify-center"
+        className="w-[90vw] max-w-[600px] h-[80vh] max-h-[600px] rounded-[10px] bg-muted flex items-center justify-center"
       >
         <VideoOff className="w-16 h-16 text-muted-foreground" />
       </motion.div>
@@ -64,7 +64,7 @@ export function VideoPreview({ isActive, videoElement }: VideoPreviewProps) {
     <motion.div
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="relative w-[600px] h-[320px] rounded-[15px] overflow-hidden bg-black"
+      className="relative w-[90vw] max-w-[600px] h-[50vh] max-h-[600px] rounded-[15px] overflow-hidden bg-black"
     >
       <div ref={containerRef} className="w-full h-full" />
       {/* Camera Active Indicator */}
