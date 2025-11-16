@@ -15,19 +15,19 @@ const envPath = path.resolve(__dirname, '../.env');
 
 if (existsSync(envPath)) {
   dotenv.config({ path: envPath });
-  console.log('[Server] ✓ Loaded unified .env file');
-  console.log(`[Server] Environment: ${process.env.NODE_ENV || 'not set'}`);
-  console.log(`[Server] Port: ${process.env.PORT || 'not set'}`);
+  console.log('[Server] ✓ Loaded .env file from filesystem');
+  console.log(`[Server] Environment: ${process.env.NODE_ENV || 'production'}`);
+  console.log(`[Server] Port: ${process.env.PORT || '3000'}`);
 } else {
-  console.warn('[Server] ⚠ No .env file found - using system environment variables');
+  console.log('[Server] ℹ No .env file found - using system environment variables (normal for Render)');
 }
 
-// Verify critical environment variables are loaded
+// Verify critical environment variables are present (from .env or system)
 const requiredVars = ['OPENROUTER_API_KEY', 'PINECONE_API_KEY'];
 const missingVars = requiredVars.filter(varName => !process.env[varName]);
 if (missingVars.length > 0) {
   console.error(`[Server] ❌ Missing required environment variables: ${missingVars.join(', ')}`);
-  console.error('[Server] Please ensure .env file exists with all required keys');
+  console.error('[Server] Please set these in Render dashboard: https://dashboard.render.com');
   process.exit(1);
 }
 
