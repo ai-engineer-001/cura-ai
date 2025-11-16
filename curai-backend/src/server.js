@@ -37,31 +37,12 @@ const server = Fastify({
   }
 });
 
-// Register CORS with dynamic origin support
-const allowedOrigins = process.env.ALLOWED_ORIGINS 
-  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
-  : ['http://localhost:3001', 'http://127.0.0.1:3001'];
-
+// Register CORS - allow all origins by default (can be tightened later)
 await server.register(cors, {
-  origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, curl, etc.)
-    if (!origin) return callback(null, true);
-    
-    // Allow all origins in development
-    if (process.env.NODE_ENV === 'development') {
-      return callback(null, true);
-    }
-    
-    // Check if origin is in allowed list for production
-    if (allowedOrigins.some(allowed => origin.startsWith(allowed))) {
-      return callback(null, true);
-    }
-    
-    callback(new Error('Not allowed by CORS'));
-  },
+  origin: true,
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Accept', 'Authorization']
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Accept", "Authorization"]
 });
 
 // Register multipart for file uploads
