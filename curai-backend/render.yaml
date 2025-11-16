@@ -1,0 +1,22 @@
+# Render.com Build Configuration for Cura AI Backend
+
+# Build Command
+build:
+  command: npm install
+
+# Start Command
+start:
+  command: npm start
+
+# Environment
+runtime: node
+nodeVersion: 18
+
+# Health Check
+healthCheckPath: /api/health
+
+# Environment Variables (Set these in Render Dashboard)
+# OPENROUTER_API_KEY
+# PINECONE_API_KEY
+# PINECONE_HOST
+# ALLOWED_ORIGINS=https://your-vercel-app.vercel.app

@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cura AI - Real-Time Emergency Assistant</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    
+    * {
+      font-family: 'Inter', sans-serif;
+    }
+    
+    body {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+    }
+    
+    .chat-container {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+    
+    .message {
+      animation: slideIn 0.3s ease-out;
+    }
+    
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    .waveform {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      height: 40px;
+    }
+    
+    .waveform-bar {
+      width: 3px;
+      background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+      border-radius: 3px;
+      animation: wave 1s ease-in-out infinite;
+    }
+    
+    .waveform-bar:nth-child(1) { animation-delay: 0s; }
+    .waveform-bar:nth-child(2) { animation-delay: 0.1s; }
+    .waveform-bar:nth-child(3) { animation-delay: 0.2s; }
+    .waveform-bar:nth-child(4) { animation-delay: 0.3s; }
+    .waveform-bar:nth-child(5) { animation-delay: 0.4s; }
+    
+    @keyframes wave {
+      0%, 100% { height: 8px; }
+      50% { height: 32px; }
+    }
+    
+    .pulse {
+      animation: pulse 2s ease-in-out infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
+    .realtime-overlay {
+      backdrop-filter: blur(10px);
+      background: rgba(255, 255, 255, 0.95);
+      border: 2px solid #667eea;
+    }
+  </style>
+</head>
+<body class="p-4">
+  <div class="max-w-4xl mx-auto h-screen flex flex-col">
+    <!-- Header -->
+    <div class="bg-white rounded-t-2xl p-6 shadow-lg">
+      <h1 class="text-2xl font-bold text-gray-800">🏥 Cura AI Emergency Assistant</h1>
+      <p class="text-sm text-gray-600 mt-1">Real-time voice and text support</p>
+      <div class="mt-4 flex gap-4 text-xs">
+        <div class="bg-green-100 text-green-800 px-3 py-1 rounded-full font-medium">
+          <span id="status-indicator">● Connected</span>
+        </div>
+        <div class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full font-medium">
+          Model: Llama 3.3 8B
+        </div>
+      </div>
+    </div>
+
+    <!-- Chat Messages -->
+    <div id="chat-messages" class="flex-1 bg-white p-6 overflow-y-auto space-y-4">
+      <div class="text-center text-gray-500 text-sm">
+        <p>👋 Welcome! Start typing or use Real-Time mode for voice assistance.</p>
+      </div>
+    </div>
+
+    <!-- Bottom Input Area -->
+    <div class="bg-white rounded-b-2xl p-6 shadow-lg border-t relative">
+      <!-- Real-Time Overlay (hidden by default) -->
+      <div id="realtime-overlay" class="hidden absolute bottom-full left-0 right-0 mb-4 mx-6 realtime-overlay rounded-2xl p-6 shadow-2xl">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-3">
+            <div class="bg-red-500 text-white px-3 py-1 rounded-full text-xs font-bold pulse">● LIVE</div>
+            <span id="realtime-timer" class="text-sm text-gray-600">00:00</span>
+          </div>
+          <button onclick="stopRealtime()" class="text-gray-500 hover:text-gray-700">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <!-- Waveform -->
+        <div class="waveform mb-4" id="waveform">
+          <div class="waveform-bar"></div>
+          <div class="waveform-bar"></div>
+          <div class="waveform-bar"></div>
+          <div class="waveform-bar"></div>
+          <div class="waveform-bar"></div>
+        </div>
+
+        <!-- Controls -->
+        <div class="flex items-center justify-center gap-4 mb-4">
+          <button id="mic-toggle" onclick="toggleMic()" class="bg-blue-500 text-white p-3 rounded-full hover:bg-blue-600 transition">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+            </svg>
+          </button>
+          <button id="camera-toggle" onclick="toggleCamera()" class="bg-gray-500 text-white p-3 rounded-full hover:bg-gray-600 transition">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+          </button>
+        </div>
+
+        <!-- Emergency Actions -->
+        <div class="grid grid-cols-2 gap-3">
+          <button class="bg-red-500 text-white px-4 py-3 rounded-xl font-semibold hover:bg-red-600 transition">
+            📞 Call 911
+          </button>
+          <button class="bg-orange-500 text-white px-4 py-3 rounded-xl font-semibold hover:bg-orange-600 transition">
+            📍 Share Location
+          </button>
+        </div>
+
+        <p class="text-xs text-center text-gray-600 mt-4">
+          🎤 Listening... Speak naturally. Auto-detects pauses.
+        </p>
+      </div>
+
+      <!-- Input Row -->
+      <div class="flex items-end gap-3">
+        <button class="text-gray-400 hover:text-gray-600 p-2">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+          </svg>
+        </button>
+
+        <div class="flex-1">
+          <textarea
+            id="message-input"
+            rows="1"
+            placeholder="Ask anything..."
+            class="w-full px-4 py-3 border border-gray-300 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            onkeydown="handleKeyDown(event)"
+          ></textarea>
+        </div>
+
+        <div class="flex gap-2">
+          <button
+            id="realtime-btn"
+            onclick="toggleRealtime()"
+            class="bg-white border-2 border-gray-300 text-gray-700 px-5 py-3 rounded-full font-semibold hover:border-blue-500 hover:text-blue-500 transition flex items-center gap-2"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15.536a5 5 0 001.414 1.414m2.828-9.9a9 9 0 012.828 0" />
+            </svg>
+            Real-Time
+          </button>
+          <button
+            onclick="sendMessage()"
+            class="bg-blue-500 text-white p-3 rounded-full hover:bg-blue-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // State
+    let ws = null;
+    let token = null;
+    let chatId = null;
+    let isRealtimeActive = false;
+    let mediaRecorder = null;
+    let audioStream = null;
+    let realtimeStartTime = null;
+
+    // Initialize
+    async function init() {
+      try {
+        // Get demo token
+        const response = await fetch('http://localhost:4000/v1/demo/login');
+        const data = await response.json();
+        token = data.token;
+        
+        // Create a chat
+        const chatResponse = await fetch('http://localhost:4000/v1/chats', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ title: 'Emergency Test Chat' })
+        });
+        const chatData = await chatResponse.json();
+        chatId = chatData.chatId;
+        
+        updateStatus('Connected', 'green');
+        console.log('Initialized:', { token, chatId });
+      } catch (error) {
+        console.error('Init error:', error);
+        updateStatus('Connection Failed', 'red');
+      }
+    }
+
+    // Connect WebSocket
+    function connectWebSocket() {
+      if (!token || !chatId) {
+        console.error('No token or chatId');
+        return;
+      }
+
+      ws = new WebSocket(`ws://localhost:4000/realtime?chatId=${chatId}&token=${token}`);
+
+      ws.onopen = () => {
+        console.log('WebSocket connected');
+        updateStatus('WebSocket Connected', 'green');
+      };
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        console.log('WS message:', data);
+
+        if (data.type === 'transcription') {
+          addMessage('user', data.text, true);
+        } else if (data.type === 'assistant_token') {
+          appendAssistantToken(data.token);
+        } else if (data.type === 'assistant_final') {
+          finalizeAssistantMessage(data.text);
+        } else if (data.type === 'ack') {
+          console.log('ACK:', data.message);
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        updateStatus('WebSocket Error', 'red');
+      };
+
+      ws.onclose = () => {
+        console.log('WebSocket closed');
+        updateStatus('Disconnected', 'yellow');
+      };
+    }
+
+    // Toggle Real-Time mode
+    async function toggleRealtime() {
+      if (isRealtimeActive) {
+        stopRealtime();
+      } else {
+        await startRealtime();
+      }
+    }
+
+    async function startRealtime() {
+      try {
+        // Request microphone
+        audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        
+        // Connect WebSocket if not connected
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+          connectWebSocket();
+          // Wait for connection
+          await new Promise(resolve => {
+            const interval = setInterval(() => {
+              if (ws && ws.readyState === WebSocket.OPEN) {
+                clearInterval(interval);
+                resolve();
+              }
+            }, 100);
+          });
+        }
+
+        // Send start control
+        ws.send(JSON.stringify({ type: 'control', action: 'start_realtime' }));
+
+        // Setup MediaRecorder
+        mediaRecorder = new MediaRecorder(audioStream, {
+          mimeType: 'audio/webm;codecs=opus'
+        });
+
+        let audioChunks = [];
+        let chunkSeq = 0;
+
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            // Convert to base64 and send
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const base64 = reader.result.split(',')[1];
+              ws.send(JSON.stringify({
+                type: 'audio_chunk',
+                seq: chunkSeq++,
+                audio_format: 'webm-opus',
+                payload: base64
+              }));
+            };
+            reader.readAsDataURL(event.data);
+          }
+        };
+
+        mediaRecorder.start(2000); // 2-second chunks
+
+        // Update UI
+        isRealtimeActive = true;
+        document.getElementById('realtime-overlay').classList.remove('hidden');
+        document.getElementById('realtime-btn').classList.add('bg-blue-500', 'text-white', 'border-blue-500');
+        document.getElementById('realtime-btn').classList.remove('bg-white', 'text-gray-700', 'border-gray-300');
+        
+        realtimeStartTime = Date.now();
+        startTimer();
+
+      } catch (error) {
+        console.error('Start realtime error:', error);
+        alert('Microphone access denied or not available');
+      }
+    }
+
+    function stopRealtime() {
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+      }
+      if (audioStream) {
+        audioStream.getTracks().forEach(track => track.stop());
+      }
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'control', action: 'stop_realtime' }));
+      }
+
+      isRealtimeActive = false;
+      document.getElementById('realtime-overlay').classList.add('hidden');
+      document.getElementById('realtime-btn').classList.remove('bg-blue-500', 'text-white', 'border-blue-500');
+      document.getElementById('realtime-btn').classList.add('bg-white', 'text-gray-700', 'border-gray-300');
+    }
+
+    function startTimer() {
+      const interval = setInterval(() => {
+        if (!isRealtimeActive) {
+          clearInterval(interval);
+          return;
+        }
+        const elapsed = Math.floor((Date.now() - realtimeStartTime) / 1000);
+        const minutes = Math.floor(elapsed / 60).toString().padStart(2, '0');
+        const seconds = (elapsed % 60).toString().padStart(2, '0');
+        document.getElementById('realtime-timer').textContent = `${minutes}:${seconds}`;
+      }, 1000);
+    }
+
+    function toggleMic() {
+      console.log('Toggle mic');
+    }
+
+    function toggleCamera() {
+      console.log('Toggle camera');
+    }
+
+    // Send text message
+    async function sendMessage() {
+      const input = document.getElementById('message-input');
+      const text = input.value.trim();
+      if (!text) return;
+
+      addMessage('user', text);
+      input.value = '';
+
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'text_message', text }));
+      } else {
+        // Fallback to REST API
+        try {
+          const response = await fetch(`http://localhost:4000/v1/chats/${chatId}/messages`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ text })
+          });
+          const data = await response.json();
+          addMessage('assistant', data.text);
+        } catch (error) {
+          console.error('Send message error:', error);
+        }
+      }
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        sendMessage();
+      }
+    }
+
+    // UI helpers
+    function addMessage(role, text, isTranscription = false) {
+      const container = document.getElementById('chat-messages');
+      const messageDiv = document.createElement('div');
+      messageDiv.className = `message flex ${role === 'user' ? 'justify-end' : 'justify-start'}`;
+      
+      const bubble = document.createElement('div');
+      bubble.className = `max-w-xl px-4 py-3 rounded-2xl ${
+        role === 'user' 
+          ? 'bg-blue-500 text-white' 
+          : 'bg-gray-100 text-gray-800'
+      }`;
+      
+      if (isTranscription) {
+        bubble.innerHTML = `<span class="text-xs opacity-75">🎤 Transcription:</span><br>${text}`;
+      } else {
+        bubble.textContent = text;
+      }
+      
+      messageDiv.appendChild(bubble);
+      container.appendChild(messageDiv);
+      container.scrollTop = container.scrollHeight;
+
+      // If assistant message, store reference for streaming
+      if (role === 'assistant') {
+        bubble.dataset.streaming = 'true';
+      }
+    }
+
+    let currentAssistantBubble = null;
+
+    function appendAssistantToken(token) {
+      if (!currentAssistantBubble) {
+        const container = document.getElementById('chat-messages');
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message flex justify-start';
+        
+        const bubble = document.createElement('div');
+        bubble.className = 'max-w-xl px-4 py-3 rounded-2xl bg-gray-100 text-gray-800';
+        bubble.textContent = token;
+        
+        messageDiv.appendChild(bubble);
+        container.appendChild(messageDiv);
+        currentAssistantBubble = bubble;
+      } else {
+        currentAssistantBubble.textContent += token;
+      }
+      
+      document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
+    }
+
+    function finalizeAssistantMessage(text) {
+      if (currentAssistantBubble) {
+        currentAssistantBubble.textContent = text;
+        currentAssistantBubble = null;
+      }
+    }
+
+    function updateStatus(text, color) {
+      const indicator = document.getElementById('status-indicator');
+      indicator.textContent = `● ${text}`;
+      indicator.parentElement.className = `bg-${color}-100 text-${color}-800 px-3 py-1 rounded-full font-medium`;
+    }
+
+    // Initialize on load
+    init();
+  </script>
+</body>
+</html>

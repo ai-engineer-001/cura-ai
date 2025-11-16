@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cura AI - RAG Medical Assistant (Pinecone Powered)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    
+    * { font-family: 'Inter', sans-serif; }
+    
+    body {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+    }
+    
+    .message {
+      animation: slideIn 0.3s ease-out;
+    }
+    
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .source-card {
+      transition: all 0.2s;
+    }
+    
+    .source-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    
+    .pulse-dot {
+      animation: pulse 2s ease-in-out infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.95); }
+    }
+    
+    .loading-dots span {
+      animation: loading 1.4s infinite;
+    }
+    
+    .loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+    
+    @keyframes loading {
+      0%, 60%, 100% { transform: translateY(0); }
+      30% { transform: translateY(-10px); }
+    }
+  </style>
+</head>
+<body class="p-4">
+  <div class="max-w-6xl mx-auto h-screen flex flex-col">
+    <!-- Header -->
+    <div class="bg-white rounded-t-2xl p-6 shadow-lg">
+      <div class="flex items-center justify-between">
+        <div>
+          <h1 class="text-2xl font-bold text-gray-800">🏥 Cura AI Medical Assistant</h1>
+          <p class="text-sm text-gray-600 mt-1">Powered by Pinecone RAG + OpenRouter LLM</p>
+        </div>
+        <div class="flex flex-col items-end gap-2">
+          <div class="flex gap-2">
+            <div id="backend-status" class="bg-gray-100 text-gray-500 px-3 py-1 rounded-full text-xs font-medium">
+              <span class="pulse-dot">●</span> Checking...
+            </div>
+            <div id="pinecone-status" class="bg-gray-100 text-gray-500 px-3 py-1 rounded-full text-xs font-medium">
+              <span class="pulse-dot">●</span> Pinecone
+            </div>
+          </div>
+          <div class="text-xs text-gray-500">
+            <span id="vector-count">Loading...</span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Mode Selector - Removed, always in text mode with voice button -->
+    </div>
+
+    <!-- Chat Messages -->
+    <div id="chat-messages" class="flex-1 bg-white p-6 overflow-y-auto">
+      <div class="text-center text-gray-500 text-sm space-y-2">
+        <p class="text-lg">👋 Welcome to Cura AI Medical Assistant</p>
+        <div class="max-w-2xl mx-auto text-left bg-blue-50 p-4 rounded-lg mt-4">
+          <p class="font-semibold text-blue-900 mb-2">📚 Knowledge Base Ready:</p>
+          <ul class="text-sm text-blue-800 space-y-1">
+            <li>✓ <strong>MedQA</strong> - USMLE-style clinical questions</li>
+            <li>✓ <strong>BioASQ</strong> - PubMed literature</li>
+            <li>✓ <strong>MedMCQA</strong> - Medical exam questions</li>
+            <li class="mt-2 text-xs text-blue-600">💡 <span id="example-count">Loading vector count...</span></li>
+          </ul>
+        </div>
+        <p class="mt-4 text-xs text-gray-400">Try: "What are the symptoms of type 2 diabetes?" or "Explain acute myocardial infarction"</p>
+      </div>
+    </div>
+
+    <!-- Bottom Input Area -->
+    <div class="bg-white rounded-b-2xl p-6 shadow-lg border-t">
+      <div class="flex items-end gap-3">
+        <!-- Voice Mode Toggle Button -->
+        <button
+          id="voice-toggle"
+          onclick="toggleVoiceMode()"
+          class="bg-purple-500 text-white px-4 py-3 rounded-xl font-semibold hover:bg-purple-600 transition flex items-center gap-2"
+          title="Toggle voice mode"
+        >
+          <svg id="mic-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+          </svg>
+          <span id="voice-status">Voice</span>
+        </button>
+        
+        <!-- Text Input -->
+        <div class="flex-1">
+          <textarea
+            id="message-input"
+            rows="1"
+            placeholder="Ask a medical question..."
+            class="w-full px-4 py-3 border border-gray-300 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            onkeydown="handleKeyDown(event)"
+          ></textarea>
+        </div>
+
+        <!-- Send Button -->
+        <button
+          id="send-btn"
+          onclick="sendRAGQuery()"
+          class="bg-blue-500 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-600 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          Search
+        </button>
+      </div>
+      
+      <!-- Voice Recording Indicator -->
+      <div id="voice-indicator" class="hidden mt-3 text-center">
+        <div class="inline-flex items-center gap-2 bg-red-50 text-red-600 px-4 py-2 rounded-lg">
+          <span class="pulse-dot text-red-500">🔴</span>
+          <span class="font-medium">Recording... Speak now</span>
+        </div>
+      </div>
+    </div>
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+            </svg>
+            Start Real-Time Voice Mode
+          </button>
+          <p class="text-xs text-gray-500">WebSocket connection required</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Configuration
+    const CONFIG = {
+      BACKEND_URL: 'http://localhost:3000',
+      WS_URL: 'ws://localhost:3000',
+      CHECK_INTERVAL: 30000 // Check stats every 30s
+    };
+
+    // State
+    let ws = null;
+    let isVoiceMode = false;
+    let isRecording = false;
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let recognition = null;
+    let vectorCount = 0;
+
+    // Initialize
+    async function init() {
+      console.log('🚀 Initializing Cura AI Frontend...');
+      await checkBackendStatus();
+      await loadPineconeStats();
+      setupSpeechRecognition();
+      
+      // Periodic health check
+      setInterval(checkBackendStatus, CONFIG.CHECK_INTERVAL);
+    }
+    
+    // Setup Web Speech API
+    function setupSpeechRecognition() {
+      // Load voices for TTS
+      if ('speechSynthesis' in window) {
+        speechSynthesis.onvoiceschanged = () => {
+          const voices = speechSynthesis.getVoices();
+          console.log('Available voices:', voices.length);
+        };
+        // Trigger voice loading
+        speechSynthesis.getVoices();
+      }
+      
+      if ('webkitSpeechRecognition' in window) {
+        recognition = new webkitSpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.lang = 'en-US';
+        recognition.maxAlternatives = 1;
+        
+        recognition.onresult = async (event) => {
+          const transcript = event.results[0][0].transcript;
+          console.log('Recognized:', transcript);
+          document.getElementById('message-input').value = transcript;
+          stopVoiceRecording();
+          
+          // Auto-send after speech is recognized
+          await sendRAGQuery(true); // true = voice mode, enable TTS response
+        };
+        
+        recognition.onerror = (event) => {
+          console.error('Speech recognition error:', event.error);
+          
+          // Handle 'no-speech' error gracefully (user stopped speaking or didn't speak)
+          if (event.error === 'no-speech') {
+            console.log('No speech detected, turning off mic');
+            stopVoiceRecording();
+            // Don't show error message - this is normal behavior
+          } else if (event.error === 'aborted') {
+            // User manually stopped - no error message needed
+            stopVoiceRecording();
+          } else {
+            // Real errors
+            stopVoiceRecording();
+            addMessage('error', `Voice recognition error: ${event.error}. Please try again.`);
+          }
+        };
+        
+        recognition.onend = () => {
+          console.log('Recognition ended');
+          if (isRecording) {
+            // If still in recording state when recognition ends, turn off mic
+            stopVoiceRecording();
+          }
+        };
+        
+        // Auto-timeout: stop recording after 10 seconds of no speech
+        recognition.onspeechend = () => {
+          console.log('Speech ended, processing...');
+          // Recognition will automatically stop and trigger onend
+        };
+      } else {
+        console.warn('Web Speech API not supported');
+      }
+    }
+    
+    // Toggle voice mode
+    function toggleVoiceMode() {
+      if (!recognition) {
+        alert('Voice recognition not supported in your browser. Please use Chrome or Edge.');
+        return;
+      }
+      
+      if (isRecording) {
+        stopVoiceRecording();
+      } else {
+        startVoiceRecording();
+      }
+    }
+    
+    // Start voice recording
+    function startVoiceRecording() {
+      isRecording = true;
+      
+      // Update UI
+      const voiceBtn = document.getElementById('voice-toggle');
+      const voiceStatus = document.getElementById('voice-status');
+      const voiceIndicator = document.getElementById('voice-indicator');
+      
+      voiceBtn.classList.remove('bg-purple-500', 'hover:bg-purple-600');
+      voiceBtn.classList.add('bg-red-500', 'hover:bg-red-600', 'animate-pulse');
+      voiceStatus.textContent = 'Recording';
+      voiceIndicator.classList.remove('hidden');
+      
+      // Start recognition
+      try {
+        recognition.start();
+        console.log('Voice recording started');
+      } catch (error) {
+        console.error('Failed to start recognition:', error);
+        stopVoiceRecording();
+      }
+    }
+    
+    // Stop voice recording
+    function stopVoiceRecording() {
+      isRecording = false;
+      
+      // Update UI
+      const voiceBtn = document.getElementById('voice-toggle');
+      const voiceStatus = document.getElementById('voice-status');
+      const voiceIndicator = document.getElementById('voice-indicator');
+      
+      voiceBtn.classList.remove('bg-red-500', 'hover:bg-red-600', 'animate-pulse');
+      voiceBtn.classList.add('bg-purple-500', 'hover:bg-purple-600');
+      voiceStatus.textContent = 'Voice';
+      voiceIndicator.classList.add('hidden');
+      
+      // Stop recognition
+      if (recognition) {
+        try {
+          recognition.stop();
+        } catch (error) {
+          console.log('Recognition already stopped');
+        }
+      }
+    }
+    
+    // Text-to-Speech for voice mode
+    function speakResponse(text) {
+      if ('speechSynthesis' in window) {
+        // Cancel any ongoing speech
+        speechSynthesis.cancel();
+        
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 1.0;
+        utterance.pitch = 1.0;
+        utterance.volume = 1.0;
+        utterance.lang = 'en-US';
+        
+        // Use a more natural voice if available
+        const voices = speechSynthesis.getVoices();
+        const preferredVoice = voices.find(voice => 
+          voice.name.includes('Google') || 
+          voice.name.includes('Natural') ||
+          voice.name.includes('Premium')
+        );
+        if (preferredVoice) {
+          utterance.voice = preferredVoice;
+        }
+        
+        utterance.onstart = () => {
+          console.log('Speaking response...');
+        };
+        
+        utterance.onend = () => {
+          console.log('Finished speaking');
+        };
+        
+        utterance.onerror = (event) => {
+          console.error('Speech synthesis error:', event);
+        };
+        
+        speechSynthesis.speak(utterance);
+      }
+    }
+
+    // Check backend health
+    async function checkBackendStatus() {
+      try {
+        const response = await fetch(`${CONFIG.BACKEND_URL}/api/health`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          updateStatus('backend-status', 'connected', `Backend v${data.version || '1.0'}`);
+        } else {
+          updateStatus('backend-status', 'error', 'Backend Error');
+        }
+      } catch (error) {
+        console.error('Backend check failed:', error);
+        updateStatus('backend-status', 'error', 'Backend Offline');
+      }
+    }
+
+    // Load Pinecone stats
+    async function loadPineconeStats() {
+      try {
+        // Call backend endpoint that queries Pinecone
+        const response = await fetch(`${CONFIG.BACKEND_URL}/api/embed/stats`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          vectorCount = data.vectorCount || 0;
+          
+          updateStatus('pinecone-status', 'connected', `${vectorCount.toLocaleString()} vectors`);
+          document.getElementById('vector-count').textContent = `${vectorCount.toLocaleString()} medical records indexed`;
+          document.getElementById('example-count').textContent = `${vectorCount.toLocaleString()} verified medical Q&A pairs ready`;
+        } else {
+          updateStatus('pinecone-status', 'warning', 'Stats unavailable');
+        }
+      } catch (error) {
+        console.error('Pinecone stats failed:', error);
+        updateStatus('pinecone-status', 'warning', 'Pinecone check failed');
+      }
+    }
+
+    // Update status badge
+    function updateStatus(elementId, status, text) {
+      const el = document.getElementById(elementId);
+      const colors = {
+        connected: { bg: 'bg-green-100', text: 'text-green-800', dot: '🟢' },
+        error: { bg: 'bg-red-100', text: 'text-red-800', dot: '🔴' },
+        warning: { bg: 'bg-yellow-100', text: 'text-yellow-800', dot: '🟡' }
+      };
+      
+      const c = colors[status] || colors.warning;
+      el.className = `${c.bg} ${c.text} px-3 py-1 rounded-full text-xs font-medium`;
+      el.innerHTML = `${c.dot} ${text}`;
+    }
+
+    // Send RAG query
+    async function sendRAGQuery(enableVoice = false) {
+      const input = document.getElementById('message-input');
+      const query = input.value.trim();
+      
+      if (!query) {
+        alert('Please enter a medical question');
+        return;
+      }
+      
+      // Add user message
+      addMessage('user', query, null, false, enableVoice ? '🎤' : '');
+      input.value = '';
+      
+      // Show loading
+      const loadingId = addLoadingMessage();
+      
+      // Disable send button
+      const sendBtn = document.getElementById('send-btn');
+      sendBtn.disabled = true;
+      sendBtn.innerHTML = '<span class="loading-dots flex gap-1"><span>●</span><span>●</span><span>●</span></span>';
+      
+      try {
+        console.log('📡 Sending RAG query:', { query });
+        
+        const response = await fetch(`${CONFIG.BACKEND_URL}/api/search`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          mode: 'cors',
+          body: JSON.stringify({ 
+            query, 
+            emergency: false,
+            topK: 5
+          })
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          
+          // Remove loading first
+          removeLoadingMessage(loadingId);
+          
+          // Check if it's a "no vectors" error
+          if (errorData.message?.includes('No matches found') || errorData.warning?.includes('No relevant')) {
+            addMessage('system', `⏳ Knowledge base is still being populated (embedding in progress).\n\nThe system needs medical Q&A vectors in Pinecone to answer questions.\n\nCurrent status: Check terminal running "embed-datasets.js" for progress.\nExpected completion: ~2-3 hours for 260k vectors.`);
+            return;
+          }
+          
+          throw new Error(`HTTP ${response.status}: ${errorData.message || response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log('✅ RAG Response:', data);
+        
+        // Remove loading
+        removeLoadingMessage(loadingId);
+        
+        // Check if response indicates no data
+        if (data.warning && !data.fallback) {
+          addMessage('system', `⏳ No relevant medical information found in knowledge base.\n\n${data.warning}\n\nOnce vectors are added, you'll be able to search the medical knowledge base.`);
+          return;
+        }
+        
+        // Show confidence level and warnings
+        const confidenceLabels = {
+          high: '✅ High Confidence',
+          partial: '⚠️ Partial Confidence',
+          low: '⚠️ Low Confidence',
+          fallback: '🤖 Model-Only Response'
+        };
+        
+        const confidenceMessages = {
+          high: 'Response backed by highly relevant medical sources',
+          partial: 'Response based on sources + medical knowledge (sources partially relevant)',
+          low: 'Response primarily from medical knowledge (limited source relevance)',
+          fallback: data.warning || 'No relevant sources found — using LLM medical knowledge only'
+        };
+        
+        if (data.confidenceLevel && data.confidenceLevel !== 'high') {
+          const label = confidenceLabels[data.confidenceLevel] || '';
+          const message = confidenceMessages[data.confidenceLevel] || '';
+          addMessage('system', `${label}: ${message}${data.topScore ? `\n\nTop relevance score: ${data.topScore.toFixed(3)}` : ''}`);
+        }
+        
+        // Add assistant response
+        addMessage('assistant', data.response, data.sources, false);
+        
+        // If voice mode, speak the response
+        if (enableVoice) {
+          speakResponse(data.response);
+        }
+        
+        // Show sources if available
+        if (data.sources && data.sources.length > 0) {
+          addSourcesCard(data.sources, data.confidenceLevel);
+        } else if (!data.fallback) {
+          // No sources but not fallback mode - indicate search completed but no matches
+          addMessage('system', '💡 No exact matches found in knowledge base for this query. Consider rephrasing or asking a more general question.');
+        }
+        
+      } catch (error) {
+        console.error('❌ RAG query failed:', error);
+        removeLoadingMessage(loadingId);
+        addMessage('error', `Error: ${error.message}\n\nTroubleshooting:\n• Check backend is running: http://localhost:3000/health\n• Check Pinecone status: node check-pinecone-stats.js\n• Wait for embedding to complete if in progress`);
+      } finally {
+        sendBtn.disabled = false;
+        sendBtn.innerHTML = `
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          Search
+        `;
+      }
+    }
+
+    // Real-time mode (WebSocket)
+    async function toggleRealtime() {
+      if (isRealtimeActive) {
+        stopRealtime();
+      } else {
+        await startRealtime();
+      }
+    }
+
+    async function startRealtime() {
+      try {
+        ws = new WebSocket(`${CONFIG.WS_URL}/ws/realtime?sessionId=web-${Date.now()}`);
+        
+        ws.onopen = () => {
+          console.log('✅ WebSocket connected');
+          isRealtimeActive = true;
+          updateRealtimeButton(true);
+          addMessage('system', '🎤 Real-time voice mode activated. Start speaking...');
+        };
+        
+        ws.onmessage = (event) => {
+          const data = JSON.parse(event.data);
+          handleWebSocketMessage(data);
+        };
+        
+        ws.onerror = (error) => {
+          console.error('❌ WebSocket error:', error);
+          addMessage('error', 'WebSocket connection failed');
+        };
+        
+        ws.onclose = () => {
+          console.log('WebSocket closed');
+          isRealtimeActive = false;
+          updateRealtimeButton(false);
+        };
+        
+      } catch (error) {
+        console.error('Real-time start error:', error);
+        alert('Failed to start real-time mode');
+      }
+    }
+
+    function stopRealtime() {
+      if (ws) {
+        ws.close();
+        ws = null;
+      }
+      isRealtimeActive = false;
+      updateRealtimeButton(false);
+      addMessage('system', 'Real-time mode stopped');
+    }
+
+    function updateRealtimeButton(active) {
+      const btn = document.getElementById('realtime-toggle');
+      if (active) {
+        btn.textContent = '⏹ Stop Real-Time Mode';
+        btn.classList.remove('bg-purple-500', 'hover:bg-purple-600');
+        btn.classList.add('bg-red-500', 'hover:bg-red-600');
+      } else {
+        btn.innerHTML = `
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+          </svg>
+          Start Real-Time Voice Mode
+        `;
+        btn.classList.remove('bg-red-500', 'hover:bg-red-600');
+        btn.classList.add('bg-purple-500', 'hover:bg-purple-600');
+      }
+    }
+
+    function handleWebSocketMessage(data) {
+      console.log('WS Message:', data);
+      // Handle different message types from WebSocket
+      if (data.type === 'transcription') {
+        addMessage('user', data.text, null, false, '🎤');
+      } else if (data.type === 'assistant_response') {
+        addMessage('assistant', data.text);
+      }
+    }
+
+    // UI helpers
+    function addMessage(role, text, sources = null, emergency = false, prefix = '') {
+      const container = document.getElementById('chat-messages');
+      const messageDiv = document.createElement('div');
+      messageDiv.className = 'message mb-4';
+      
+      let bgColor, textColor, align;
+      if (role === 'user') {
+        bgColor = 'bg-blue-500'; textColor = 'text-white'; align = 'justify-end';
+      } else if (role === 'error') {
+        bgColor = 'bg-red-100'; textColor = 'text-red-800'; align = 'justify-start';
+      } else if (role === 'system') {
+        bgColor = 'bg-gray-100'; textColor = 'text-gray-600'; align = 'justify-center';
+      } else {
+        bgColor = emergency ? 'bg-red-50 border-2 border-red-300' : 'bg-gray-100';
+        textColor = emergency ? 'text-red-900' : 'text-gray-800';
+        align = 'justify-start';
+      }
+      
+      messageDiv.innerHTML = `
+        <div class="flex ${align}">
+          <div class="${bgColor} ${textColor} max-w-3xl px-5 py-3 rounded-2xl shadow-sm">
+            ${prefix ? `<span class="mr-2">${prefix}</span>` : ''}
+            ${emergency ? '<strong class="text-red-600">🚨 EMERGENCY RESPONSE:</strong><br>' : ''}
+            <div class="whitespace-pre-wrap">${escapeHtml(text)}</div>
+          </div>
+        </div>
+      `;
+      
+      container.appendChild(messageDiv);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function addSourcesCard(sources, confidenceLevel = 'high') {
+      const container = document.getElementById('chat-messages');
+      const sourcesDiv = document.createElement('div');
+      sourcesDiv.className = 'message mb-4';
+      
+      // Color scheme based on confidence
+      const colors = {
+        high: { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-900', badge: 'text-green-600' },
+        partial: { bg: 'bg-yellow-50', border: 'border-yellow-200', text: 'text-yellow-900', badge: 'text-yellow-600' },
+        low: { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-900', badge: 'text-orange-600' },
+        fallback: { bg: 'bg-gray-50', border: 'border-gray-200', text: 'text-gray-900', badge: 'text-gray-600' }
+      };
+      
+      const c = colors[confidenceLevel] || colors.high;
+      
+      let sourcesHTML = `<div class="max-w-3xl"><div class="${c.bg} border ${c.border} rounded-xl p-4">`;
+      sourcesHTML += `<p class="text-sm font-semibold ${c.text} mb-3">📚 Sources from Knowledge Base:</p>`;
+      sourcesHTML += '<div class="space-y-2">';
+      
+      sources.forEach((source, idx) => {
+        const score = (source.score * 100).toFixed(1);
+        const scoreColor = source.score >= 0.80 ? 'text-green-600' : source.score >= 0.70 ? 'text-yellow-600' : 'text-orange-600';
+        sourcesHTML += `
+          <div class="source-card bg-white p-3 rounded-lg border ${c.border} text-xs">
+            <div class="flex items-center justify-between mb-1">
+              <span class="font-semibold ${c.badge}">Source ${idx + 1}</span>
+              <span class="${scoreColor} font-mono">${score}% relevance</span>
+            </div>
+            <p class="text-gray-700">${escapeHtml(source.text?.substring(0, 200) || source.metadata?.question || 'N/A')}...</p>
+            ${source.metadata?.dataset ? `<span class="inline-block mt-1 text-xs text-gray-500">Dataset: ${source.metadata.dataset}</span>` : ''}
+          </div>
+        `;
+      });
+      
+      sourcesHTML += '</div></div></div>';
+      sourcesDiv.innerHTML = sourcesHTML;
+      container.appendChild(sourcesDiv);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    let loadingCounter = 0;
+    function addLoadingMessage() {
+      const id = `loading-${loadingCounter++}`;
+      const container = document.getElementById('chat-messages');
+      const loadingDiv = document.createElement('div');
+      loadingDiv.id = id;
+      loadingDiv.className = 'message mb-4';
+      loadingDiv.innerHTML = `
+        <div class="flex justify-start">
+          <div class="bg-gray-100 text-gray-600 px-5 py-3 rounded-2xl">
+            <span class="loading-dots flex gap-1">
+              <span>●</span><span>●</span><span>●</span>
+            </span>
+            Searching knowledge base...
+          </div>
+        </div>
+      `;
+      container.appendChild(loadingDiv);
+      container.scrollTop = container.scrollHeight;
+      return id;
+    }
+
+    function removeLoadingMessage(id) {
+      const el = document.getElementById(id);
+      if (el) el.remove();
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        sendRAGQuery();
+      }
+    }
+
+    // Initialize on load
+    init();
+  </script>
+</body>
+</html>
