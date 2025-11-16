@@ -7,8 +7,8 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon --watch src --exec node src/server.js",
-    "dev:local": "cp .env.local .env && npm run dev",
-    "build": "cp .env.production .env 2>/dev/null || copy .env.production .env || echo 'Using existing .env'",
+    "dev:local": "npm run dev",
+    "build": "echo 'Using unified .env file - no build step required'",
     "embed": "node src/scripts/embed-corpus.js",
     "embed:datasets": "node embed-datasets.js",
     "smoke": "bash tests/smoke.sh",

@@ -1,7 +1,9 @@
 # Environment variables
+# NOTE: We now use a single .env file for all environments
+# Add .env to git if you want to track it, or keep it ignored for security
 .env
-.env.local
-.env.*.local
+.env.backup
+.env.old
 
 # Dependencies
 node_modules/
